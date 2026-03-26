@@ -1,0 +1,106 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  CLIENT
+  ADMIN
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum ReservationEventType {
+  CREATED
+  UPDATED
+  CANCELLED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  passwordHash String
+  role         Role          @default(CLIENT)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  reservations Reservation[]
+  events       ReservationEvent[] @relation("ReservationEventActor")
+}
+
+model Restaurant {
+  id          String        @id @default(cuid())
+  name        String
+  address     String
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tables       Table[]
+  reservations Reservation[]
+
+  @@index([name])
+}
+
+model Table {
+  id           String        @id @default(cuid())
+  restaurantId String
+  capacity     Int
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@index([restaurantId])
+  @@index([restaurantId, capacity])
+}
+
+model Reservation {
+  id           String            @id @default(cuid())
+  userId       String
+  tableId      String
+  restaurantId String
+  startAt      DateTime
+  endAt        DateTime
+  status       ReservationStatus @default(CONFIRMED)
+  cancelledAt  DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  table      Table      @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  events     ReservationEvent[]
+
+  @@index([userId, startAt])
+  @@index([restaurantId, startAt])
+  @@index([tableId, startAt, endAt])
+}
+
+model ReservationEvent {
+  id            String               @id @default(cuid())
+  reservationId String
+  type          ReservationEventType
+  actorUserId   String?
+  at            DateTime             @default(now())
+  snapshot      Json?
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  actor       User?       @relation("ReservationEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([reservationId, at])
+}
