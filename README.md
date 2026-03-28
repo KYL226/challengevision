@@ -17,17 +17,20 @@ Ouvrir [http://localhost:3000](http://localhost:3000).
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | Chaîne SQLite, ex. `file:./dev.db` (recommandé : chemin cohérent avec la racine du projet) |
+| `DATABASE_URL` | Connexion **MySQL** (Prisma 7 + adaptateur MariaDB). Ex. `mysql://USER:PASSWORD@localhost:3306/NOM_BASE` — la base doit exister avant `migrate` |
 | `JWT_SECRET` | Secret pour signer les JWT (**obligatoire** en production) |
 | `ADMIN_BOOTSTRAP_TOKEN` | (Optionnel) Token pour créer le **premier** compte ADMIN via l’inscription (voir plus bas) |
 
 > Prisma CLI charge la config via `prisma.config.ts` (déjà présent). Next.js charge `.env` au runtime.
 
-## Base de données (Prisma)
+## Base de données (Prisma + MySQL)
 
+- Fournisseur : **MySQL** (le client utilise `@prisma/adapter-mariadb` et le connecteur `mariadb`, compatible serveurs MySQL en TCP).
 - Schéma : `prisma/schema.prisma`
 - Migrations : `prisma/migrations/`
 - Client généré : `app/generated/prisma/` (ne pas éditer à la main)
+
+Créez la base (ex. `CREATE DATABASE nom_base CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`) puis lancez les migrations.
 
 Commandes utiles :
 
