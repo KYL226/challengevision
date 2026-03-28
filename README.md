@@ -1,77 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+Application web de **réservation de tables** dans des restaurants : API REST documentée (Swagger), interface client (recherche, disponibilités, réservations) et **dashboard administrateur** (CRUD restaurants / tables, liste des réservations, stats et historique).
 
-First, run the development server:
+## Démarrage rapide
 
 ```bash
+npm install
+# Créer un fichier .env à la racine (voir tableau des variables ci-dessous)
+npx prisma migrate dev
+npx prisma generate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Ouvrir [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Variables d’environnement (`.env`)
 
-## Backend API (challenge réservation)
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | Chaîne SQLite, ex. `file:./dev.db` (recommandé : chemin cohérent avec la racine du projet) |
+| `JWT_SECRET` | Secret pour signer les JWT (**obligatoire** en production) |
+| `ADMIN_BOOTSTRAP_TOKEN` | (Optionnel) Token pour créer le **premier** compte ADMIN via l’inscription (voir plus bas) |
 
-### Swagger (livrable)
+> Prisma CLI charge la config via `prisma.config.ts` (déjà présent). Next.js charge `.env` au runtime.
 
-- Swagger UI: `http://localhost:3000/api/docs`
-- OpenAPI JSON: `http://localhost:3000/api/openapi.json`
+## Base de données (Prisma)
 
-### Base de données (SQLite + Prisma)
+- Schéma : `prisma/schema.prisma`
+- Migrations : `prisma/migrations/`
+- Client généré : `app/generated/prisma/` (ne pas éditer à la main)
 
-- DB dev: `dev.db`
-- Schema Prisma: `prisma/schema.prisma`
-
-Commandes utiles:
+Commandes utiles :
 
 ```bash
 npx prisma migrate dev
 npx prisma studio
+npx prisma generate
 ```
 
-### Auth (JWT)
+## API REST (aperçu)
 
-Variables d'environnement:
+Toutes les routes sont sous **`/api/...`**. Authentification : header `Authorization: Bearer <token>`.
 
-- `JWT_SECRET` (obligatoire)
-- `DATABASE_URL` (SQLite par défaut)
+| Domaine | Méthodes | Notes |
+|---------|----------|--------|
+| Auth | `POST /api/auth/register`, `POST /api/auth/login` | JWT renvoyé dans le corps |
+| Restaurants | `GET/POST /api/restaurants`, `GET/PUT/DELETE /api/restaurants/:id` | `POST/PUT/DELETE` : **ADMIN** |
+| Tables | `GET /api/restaurants/:id/tables`, `POST /api/tables`, `PUT/DELETE /api/tables/:id` | Création / édition / suppression : **ADMIN** |
+| Disponibilité | `GET /api/availability` | Par `tableId` ou `restaurantId` + `capacity` + plage horaire |
+| Réservations | `GET/POST /api/reservations`, `GET/PUT/DELETE /api/reservations/:id` | Client : ses réservations ; admin : toutes |
+| Historique | `GET /api/reservations/:id/history` | Événements liés à une réservation |
 
-Endpoints:
+### Swagger (livrable)
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
+- **Swagger UI** : [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
+- **OpenAPI JSON** : [http://localhost:3000/api/openapi.json](http://localhost:3000/api/openapi.json)
 
-### Création du premier admin (bootstrap)
+## Premier compte administrateur (bootstrap)
 
-Le premier ADMIN peut être créé via `POST /api/auth/register` si:
+Si aucun utilisateur **ADMIN** n’existe encore, vous pouvez en créer un via `POST /api/auth/register` en ajoutant :
 
-- `ADMIN_BOOTSTRAP_TOKEN` est défini dans `.env`
-- le header `x-bootstrap-token` correspond
-- aucun utilisateur ADMIN n’existe encore
+- dans `.env` : `ADMIN_BOOTSTRAP_TOKEN=<secret>`
+- dans la requête : header `x-bootstrap-token: <secret>`
 
-Ensuite, les endpoints admin (CRUD restaurants/tables) exigent un JWT avec `role=ADMIN`.
+Le compte créé aura le rôle **ADMIN** (uniquement tant qu’il n’y a pas encore d’admin en base).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Frontend (pages principales)
 
-## Learn More
+| Route | Rôle |
+|-------|------|
+| `/` | Accueil |
+| `/restaurants` | Liste + filtres (capacité, date, heure) |
+| `/restaurants/[id]` | Détail + tables disponibles + réservation |
+| `/login`, `/register` | Connexion / inscription |
+| `/my-reservations` | Mes réservations |
+| `/dashboard` | **Admin** : sidebar (restaurants, tables, réservations, stats / historique), thème clair-sombre, toasts |
 
-To learn more about Next.js, take a look at the following resources:
+La navbar inclut un **toggle thème** (clair / sombre) et la déconnexion.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripts npm
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run dev      # serveur de développement
+npm run build    # build production
+npm run start    # démarrage après build
+npm run lint     # ESLint
+```

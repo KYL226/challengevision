@@ -2,6 +2,7 @@ import { prisma } from "@/app/lib/db"
 import { errorJson, json, parseDate, parsePagination } from "@/app/lib/http"
 import { requireAdmin, requireAuth } from "@/app/lib/request"
 import { restaurantCreateSchema } from "@/app/lib/schemas"
+import type { Prisma } from "@/app/generated/prisma/client"
 
 export const runtime = "nodejs"
 
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
         })()
       : null
 
-  const tablesFilter =
+  const tablesFilter: Prisma.RestaurantWhereInput =
     capacityInt && Number.isFinite(capacityInt)
       ? range
         ? {

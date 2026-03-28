@@ -1,12 +1,14 @@
 import { prisma } from "@/app/lib/db"
-import { errorJson, json, parseDate } from "@/app/lib/http"
+import { json, parseDate } from "@/app/lib/http"
 
 export const runtime = "nodejs"
 
 export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id: restaurantId } = await ctx.params
   const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { id: true } })
-  if (!restaurant) return errorJson(404, "Restaurant not found")
+  // Frontend-friendly: don't 404 the availability UI.
+  // If the restaurant doesn't exist (DB reset / deleted), return empty list.
+  if (!restaurant) return json({ items: [] })
 
   const url = new URL(request.url)
   const capacity = url.searchParams.get("capacity")

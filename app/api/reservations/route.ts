@@ -3,9 +3,13 @@ import { errorJson, json, parseDate, parsePagination } from "@/app/lib/http"
 import { requireAuth } from "@/app/lib/request"
 import { reservationCreateSchema } from "@/app/lib/schemas"
 import { findAvailableTable, isTableAvailable } from "@/app/lib/reservations"
+import { ReservationStatus } from "@/app/generated/prisma/enums"
 
 export const runtime = "nodejs"
 
+// =====================
+// GET RESERVATIONS
+// =====================
 export async function GET(request: Request) {
   const auth = await requireAuth(request)
   if (auth instanceof Response) return auth
@@ -15,11 +19,18 @@ export async function GET(request: Request) {
 
   const userIdFilter = url.searchParams.get("userId")
   const restaurantId = url.searchParams.get("restaurantId")
-  const status = url.searchParams.get("status")
+  const statusParam = url.searchParams.get("status")
 
+  // ✅ Typage propre du status
+  let statusFilter: ReservationStatus | undefined
+  if (statusParam === "CONFIRMED" || statusParam === "CANCELLED") {
+    statusFilter = statusParam as ReservationStatus
+  }
+
+  // ✅ where bien typé pour Prisma
   const where = {
     ...(restaurantId ? { restaurantId } : {}),
-    ...(status === "CONFIRMED" || status === "CANCELLED" ? { status } : {}),
+    ...(statusFilter ? { status: statusFilter } : {}),
     ...(auth.role === "ADMIN"
       ? userIdFilter
         ? { userId: userIdFilter }
@@ -45,6 +56,9 @@ export async function GET(request: Request) {
   return json({ items, page, limit, total })
 }
 
+// =====================
+// CREATE RESERVATION
+// =====================
 export async function POST(request: Request) {
   const auth = await requireAuth(request)
   if (auth instanceof Response) return auth
@@ -63,25 +77,42 @@ export async function POST(request: Request) {
   let tableId = parsed.data.tableId
   let restaurantId = parsed.data.restaurantId
 
+  // 🔍 Trouver une table automatiquement si non fournie
   if (!tableId) {
-    if (!restaurantId) return errorJson(400, "restaurantId is required when tableId is not provided")
+    if (!restaurantId)
+      return errorJson(400, "restaurantId is required when tableId is not provided")
+
     const cap = parsed.data.capacity
-    if (!cap) return errorJson(400, "capacity is required when tableId is not provided")
-    const found = await findAvailableTable({ restaurantId, capacity: cap, startAt, endAt })
+    if (!cap)
+      return errorJson(400, "capacity is required when tableId is not provided")
+
+    const found = await findAvailableTable({
+      restaurantId,
+      capacity: cap,
+      startAt,
+      endAt,
+    })
+
     if (!found) return errorJson(409, "No table available for this time slot")
+
     tableId = found.id
   }
 
+  // 🔍 Vérifier l’existence de la table
   const table = await prisma.table.findUnique({
     where: { id: tableId },
     select: { id: true, restaurantId: true },
   })
+
   if (!table) return errorJson(404, "Table not found")
+
   restaurantId = restaurantId ?? table.restaurantId
 
+  // 🔒 Vérifier disponibilité
   const ok = await isTableAvailable(tableId, startAt, endAt)
   if (!ok) return errorJson(409, "Table not available for this time slot")
 
+  // ✅ Création réservation
   const reservation = await prisma.reservation.create({
     data: {
       userId: requestedUserId,
@@ -89,12 +120,17 @@ export async function POST(request: Request) {
       restaurantId,
       startAt,
       endAt,
-      status: "CONFIRMED",
+      status: ReservationStatus.CONFIRMED,
       events: {
         create: {
           type: "CREATED",
           actorUserId: auth.userId,
-          snapshot: { startAt: startAt.toISOString(), endAt: endAt.toISOString(), tableId, restaurantId },
+          snapshot: {
+            startAt: startAt.toISOString(),
+            endAt: endAt.toISOString(),
+            tableId,
+            restaurantId,
+          },
         },
       },
     },
@@ -103,4 +139,3 @@ export async function POST(request: Request) {
 
   return json(reservation, { status: 201 })
 }
-
